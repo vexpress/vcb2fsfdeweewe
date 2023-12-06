@@ -75,7 +75,7 @@
                           </div>
                           <div class="link-box" *ngIf="ques?.Links?.length">
                             <a href="javascript:void(0);" *ngFor="let link of ques.Links;" href="{{link?.Link}}"
-                              target="_blank">{{link?.Link}}</a>
+                              target="_blank" rel="noopener noreferrer">{{link?.Link}}</a>
                           </div>
                         </div>
                         <div class="right-part">

@@ -2,17 +2,14 @@ import { Component, HostListener, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { ApiUrl } from 'src/app/core/apiUrl';
 import { HttpService } from 'src/app/services/http/http.service';
-import { MessageService } from 'src/app/services/message/message.service';
-import { User } from 'src/app/shared/models/user.model';
+import { MessageService } from 'src/app/services/message/message.service'; 
 import swal from 'sweetalert2';
 import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
 import { Subject } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { DatePipe } from '@angular/common';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
+import { DatePipe } from '@angular/common'; 
 import { appConfig } from 'src/app/core/app-conf';
-import { LoaderService } from 'src/app/services/loader/loader.service';
+import { LoaderService } from 'src/app/services/loader/loader.service'; 
 
 @Component({
   selector: 'app-audit-logs',
@@ -33,19 +30,18 @@ export class AuditLogsComponent implements OnInit {
   loadCompleted = false;
   tableLoad = true;
   fromDelete = false;
-  loadingText = false;
+  loadingText = false; 
+  exportData: any;
   @HostListener('document:keydown.escape', ['$event'])
   onKeydownHandler(event: KeyboardEvent): void {
     swal.close();
   }
 
-  constructor(
-    private router: Router,
+  constructor( 
     private http: HttpService,
     private message: MessageService,
     private toastr: ToastrService,
-    private datePipe: DatePipe,
-    private loader: LoaderService
+    private datePipe: DatePipe, 
   ) {
     this.searchterm.pipe(
       // Time in milliseconds between key events
@@ -81,20 +77,27 @@ export class AuditLogsComponent implements OnInit {
     };
     this.http.getData(ApiUrl.admin.audit, params, true).subscribe((response) => {
       if (!!response) {
-        const result = response.result ? response.result : [];
-        console.log("result", result)
+        const result = response.result ? response.result : []; 
         if (result.length < this.pageSize) this.loadCompleted = true;
         result.forEach((ele: any) => {
           ele.actions = '';
-        });
-        console.log("result", this.dataSource);
+        }); 
         this.dataSource = [...this.dataSource, ...result];
-        this.isLoading = false;
-        console.log("result after", this.dataSource, this.isLoading);
+        this.isLoading = false; 
         if (this.dataSource.length === 0)
           this.toastr.error("No results matching the search criteria!");
         //  this.dataTableReload();
       }
+    });
+    this.http.getData(ApiUrl.admin.auditAll).subscribe((response: any) => {
+      if (!!response) {
+        const result = response.result ? response.result : [];
+        const formattedDate = this.datePipe.transform(new Date(), 'ddMMMyy');
+        this.exportData = result;
+        if (result.length === 0)
+          this.toastr.error("No results found"); 
+      }
+
     });
   }
   dataTableReload() {
@@ -123,7 +126,6 @@ export class AuditLogsComponent implements OnInit {
 
   /*** On Scroll load data ***/
   onScroll(): void {
-    console.log("fff", ((this.pageNumber * this.pageSize) <= this.dataSource.length) && !this.loadCompleted, this.pageNumber * this.pageSize, this.dataSource.length, this.loadCompleted, this.isLoading)
     if (!this.isLoading) {
       if (((this.pageNumber * this.pageSize) <= this.dataSource.length) && !this.loadCompleted) {
         this.pageNumber++;
@@ -132,118 +134,71 @@ export class AuditLogsComponent implements OnInit {
         this.isFullListDisplayed = true;
       }
     }
-  }
-  exportDataToExcel(): void {
-    this.exportToExcel(this.dataSource, 'user_data');
-  }
-  exportDataFromUrlToExcel() {
-    this.http.getData(ApiUrl.admin.auditAll).subscribe((response: any) => {
-      if (!!response) {
-        const result = response.result ? response.result : [];
-        const formattedDate = this.datePipe.transform(new Date(), 'ddMMMyy');
-        this.exportToExcel(result, 'PCL Log' + formattedDate);
-        if (result.length === 0)
-          this.toastr.error("No results found");
-        //  this.dataTableReload();
-      }
-
-    });
-  }
-  exportToExcel(data: any[], filename: string): void {
-    console.log("data", data);
+  } 
+  generateExcelTable() {
     const header = [
-      { name: 'ID', key: 'id', width: 10 },
-      { name: 'Event Name', key: 'eventName', width: 40 },
-      { name: 'Activity Date', key: 'activityDate', width: 20, dataType: 'Date' },
-      { name: 'Activity Time', key: 'activityTime', width: 20 },
-      { name: 'Performed By', key: 'performedBy', width: 20 },
-      { name: 'Centre Name', key: 'centreName', width: 20 },
-      { name: 'Module Name', key: 'moduleName', width: 20 }
-    ];
-    const headerNames = header.map(column => column.name);
-    const headerKeys = header.map(column => column.key);
-
-    const formattedData = data.map(item => {
+      { name: 'ID', key: 'id', width: 100 },
+      { name: 'Event Name', key: 'eventName', width: 400 },
+      { name: 'Activity Date', key: 'activityDate', width: 200, dataType: 'Date' },
+      { name: 'Activity Time', key: 'activityTime', width: 200 },
+      { name: 'Performed By', key: 'performedBy', width: 200 },
+      { name: 'Centre Name', key: 'centreName', width: 200 },
+      { name: 'Module Name', key: 'moduleName', width: 200 }
+    ]; 
+    const formattedData = this.exportData.map((item:any) => {
       const formattedItem: any = {};
-
-      headerKeys.forEach((key, index) => {
-        if (header[index].dataType === 'Date') {
-          formattedItem[headerNames[index]] = this.datePipe.transform(item[key], 'dd-MMM-yy');
+  
+      header.forEach(column => {
+        if (column.dataType === 'Date') {
+          formattedItem[column.name] = this.datePipe.transform(item[column.key], 'dd-MMM-yy');
         } else {
-          formattedItem[headerNames[index]] = item[key];
+          formattedItem[column.name] = item[column.key];
         }
       });
-
+  
       return formattedItem;
     });
-    console.log("formattedData", formattedData);
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(formattedData, { skipHeader: false });
 
-    headerNames.forEach((headerName, index) => {
-      const cellAddress = XLSX.utils.encode_cell({ r: 0, c: index });
-      ws[cellAddress] = { v: headerName, t: 's' };
-      if (header[index].width) {
-        if (!ws['!cols']) {
-          ws['!cols'] = [];
-        }
-        ws['!cols'][index] = { width: header[index].width };
-      }
+    let htmlTable = '<table border="1"><thead><tr>';
+
+    // Create table header
+    header.forEach((item:any) => {
+      htmlTable += `<th width="${item.width}">${item.name}</th>`;
     });
 
-    const wb: XLSX.WorkBook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    XLSX.writeFile(wb, filename + '.xlsx');
+    htmlTable += '</tr></thead><tbody>';
+
+    // Create table rows
+    formattedData.forEach((item:any) => { 
+      htmlTable += '<tr>';
+      Object.values(item).forEach(value => {
+        htmlTable += `<td>${value}</td>`;
+      });
+      htmlTable += '</tr>';
+    });
+
+    htmlTable += '</tbody></table>';
+
+    return htmlTable;
   }
+
+  exportToExcelNew() {
+    const excelTable = this.generateExcelTable();
+
+    // Create a Blob object and trigger a download
+    const blob = new Blob([excelTable], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement('a');
+    link.href = window.URL.createObjectURL(blob);
+    const formattedDate = this.datePipe.transform(new Date(), 'ddMMMyy');
+    link.download = 'PCL Log' + formattedDate+'.xls';
+    link.click();
+  } 
   formatDateOrTime(value: any): any {
     if (value instanceof Date) {
       return this.datePipe.transform(value, 'dd-MMM-yy');
     }
     return value;
-  }
-  /*  generatePdfFromUrl() {
-    const params = {
-      PageNumber: 0,
-      PageSize: 100000000,
-      Search: this.searchDealer
-    };
-    this.http.getData(ApiUrl.admin.audit, params).subscribe((response: any) => {
-      if (!!response) {
-        const result = response.result ? response.result : []; 
-        this.generatePdf(result, 'exported_data');
-        if (result.length === 0)
-          this.toastr.error("No results found");
-        //  this.dataTableReload();
-      }
-
-    }); 
-  }
-
-  generatePdf(data: any[],filename: string): void {
-    const header = [
-      { name: 'ID', key: 'id', width: 10 },
-      { name: 'Event Name', key: 'eventName', width: 40 },
-      { name: 'Activity Date', key: 'activityDate', width: 20, dataType: 'Date' },
-      { name: 'Activity Time', key: 'activityTime', width: 20 },
-      { name: 'Performed By', key: 'performedBy', width: 20 },
-      { name: 'Centre Name', key: 'centreName', width: 20 },
-      { name: 'Module Name', key: 'moduleName', width: 20 }
-    ];
-    const doc = new jsPDF(); 
-    const headerNames = header.map(column => column.name);
-    const headerKeys = header.map(column => column.key);
-
-    const formattedData = data.map(item =>
-      headerKeys.map(key => (item[key] instanceof Date ? this.formatDate(item[key]) : item[key]))
-    );
-
-    doc.autoTable({
-      head: [headerNames],
-      body: formattedData,
-    });
-
-    doc.save(filename + '.pdf');
-  }   */
-
+  }  
   formatDate(date: Date): string {
     // Implement your date formatting logic here
     return '';
